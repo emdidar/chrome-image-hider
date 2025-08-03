@@ -18,6 +18,30 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Listen for a message from the content script to check if hiding is enabled
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.method === 'isAutoHideEnabled') {
+    chrome.storage.session.get(['disabledTabs']).then(data => {
+      const disabledTabs = data.disabledTabs || [];
+      const isEnabled = !disabledTabs.includes(sender.tab.id);
+      sendResponse({ enabled: isEnabled });
+    });
+    return true; // Indicates that the response is sent asynchronously
+  }
+});
+
+// Clear the disabled tab from session storage when it's closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.get(['disabledTabs'], (data) => {
+    const disabledTabs = data.disabledTabs || [];
+    const index = disabledTabs.indexOf(tabId);
+    if (index > -1) {
+      disabledTabs.splice(index, 1);
+      chrome.storage.session.set({ disabledTabs });
+    }
+  });
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const domain = new URL(info.pageUrl).hostname;
 
@@ -37,27 +61,57 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: (filename) => {
-        document.querySelectorAll(`img[src$="${filename}"]`).forEach(img => img.style.display = 'none');
+        document.querySelectorAll(`img[src$="${filename}"]`).forEach(img => {
+          img.style.display = 'none';
+          img.setAttribute('data-hidden-by-extension', 'true');
+        });
       },
       args: [filename]
     });
   }
 
   if (info.menuItemId === 'toggle-auto-hide') {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        window.autoHideEnabled = !window.autoHideEnabled;
-        alert(`Auto-hide is now ${window.autoHideEnabled ? 'enabled' : 'disabled'}`);
-      }
-    });
+    const { disabledTabs = [] } = await chrome.storage.session.get(['disabledTabs']);
+    const tabId = tab.id;
+    const isDisabled = disabledTabs.includes(tabId);
+
+    if (isDisabled) {
+      // Enable it: remove from disabled list
+      const newDisabledTabs = disabledTabs.filter(id => id !== tabId);
+      await chrome.storage.session.set({ disabledTabs: newDisabledTabs });
+      // Re-apply hiding rules
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+      console.log(`Auto-hide enabled for tab ${tabId}`);
+
+    } else {
+      // Disable it: add to disabled list
+      disabledTabs.push(tabId);
+      await chrome.storage.session.set({ disabledTabs });
+       // Restore images
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          document.querySelectorAll('img[data-hidden-by-extension="true"]').forEach(img => {
+            img.style.display = '';
+            img.removeAttribute('data-hidden-by-extension');
+          });
+        }
+      });
+      console.log(`Auto-hide disabled for tab ${tabId}`);
+    }
   }
 
   if (info.menuItemId === 'restore-hidden-images') {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
-        document.querySelectorAll('img[style*="display: none"]').forEach(img => img.style.display = '');
+        document.querySelectorAll('img[data-hidden-by-extension="true"]').forEach(img => {
+          img.style.display = '';
+          img.removeAttribute('data-hidden-by-extension');
+        });
       }
     });
   }
