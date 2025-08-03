@@ -6,8 +6,8 @@ This extension allows you to hide specific images on any website. Rules are save
 
 *   **Hide Images:** Right-click on any image and select "Auto-hide this image on this site" to hide it. The image will be hidden on all pages of that website.
 *   **Manage Rules:** A popup allows you to view and remove hiding rules for each domain.
-*   **Toggle Auto-Hide:** You can temporarily disable or enable the auto-hiding functionality on a per-page basis.
-*   **Restore Images:** Restore all hidden images on the current page.
+*   **Toggle Auto-Hide:** You can temporarily disable or enable the auto-hiding functionality for the current tab. This setting resets when you close the tab.
+*   **Restore Images:** Restore all images hidden by this extension on the current page.
 
 ## Installation
 
@@ -27,7 +27,7 @@ This extension allows you to hide specific images on any website. Rules are save
     *   Click the "Clear All Rules" button to remove all hiding rules.
 4.  **Toggle auto-hiding:**
     *   Right-click anywhere on a page.
-    *   Select "Toggle auto-hide on this page".
+    *   Select "Toggle auto-hide on this page". This will disable or re-enable image hiding for the current tab only.
 5.  **Restore hidden images:**
     *   Right-click anywhere on a page.
     *   Select "Restore hidden images (this page)".
